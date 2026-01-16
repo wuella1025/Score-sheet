@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>學期成績計算 (空白版)</title>
+    <title>學期成績計算 (OCR 修復版)</title>
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <style>
         :root {
@@ -26,48 +26,52 @@
             color: var(--text-main);
             margin: 0;
             padding: 10px;
-            padding-bottom: 150px; /* 留給底部統計空間 */
+            padding-bottom: 150px;
         }
 
         .container { max-width: 800px; margin: 0 auto; }
-
         h2 { text-align: center; color: var(--text-main); margin-bottom: 15px; }
 
-        /* 控制區 */
+        /* OCR 控制區 */
         .controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
             margin-bottom: 20px;
+            text-align: center;
         }
 
         .btn-ocr {
-            background: #546e7a;
-            color: white;
-            border: 1px solid var(--border);
-            padding: 10px 20px;
-            border-radius: 8px;
+            background: var(--accent-cyan);
+            color: #2d3e46;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1rem;
             cursor: pointer;
-            display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 4px 10px rgba(78, 205, 196, 0.3);
+            display: inline-flex; align-items: center; gap: 8px;
         }
 
-        /* 空白狀態提示 */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-            border: 2px dashed var(--border);
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-
-        /* 載入條 */
-        .progress-bar {
-            width: 100%; height: 4px; background: #333; margin-top: 10px;
-            border-radius: 2px; overflow: hidden; display: none;
-        }
+        /* 狀態與除錯顯示 */
+        .ocr-status { margin-top: 10px; font-size: 0.9rem; color: var(--accent-cyan); min-height: 20px; }
+        .progress-bar { width: 100%; height: 6px; background: #333; margin-top: 10px; border-radius: 3px; overflow: hidden; display: none; }
         .progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s; }
-        .ocr-status { text-align: center; font-size: 0.85rem; color: var(--accent-cyan); margin-top: 5px; height: 20px;}
+        
+        #debugText {
+            display: none;
+            width: 100%;
+            height: 100px;
+            background: #222;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #444;
+            overflow-y: scroll;
+        }
 
         /* 列表樣式 */
         .list-header {
@@ -88,16 +92,12 @@
             margin-bottom: 2px;
             border-radius: 4px;
         }
-
         .course-summary {
             display: grid;
             grid-template-columns: 30px 1fr 50px 50px 60px 30px;
             padding: 12px 10px;
             align-items: center;
-            cursor: pointer;
         }
-
-        .course-index { font-family: monospace; color: var(--text-muted); text-align: center; }
 
         input, select {
             background: transparent;
@@ -112,47 +112,7 @@
         }
         .input-name { text-align: left; font-weight: bold; }
         input:focus { background: var(--input-bg); border-bottom: 2px solid var(--accent-cyan); }
-
         .score-display { font-weight: bold; font-size: 1.1rem; text-align: center; }
-
-        /* 細項計算區 */
-        .calc-area {
-            display: none;
-            background: #263238;
-            padding: 15px;
-            border-top: 1px dashed #546e7a;
-        }
-        .calc-active { display: block; animation: fadeIn 0.3s; }
-
-        .comp-row { display: flex; gap: 5px; margin-bottom: 8px; margin-left: 30px; }
-        .comp-row input { background: var(--bg-body); border: 1px solid var(--border); font-size: 0.9rem; }
-
-        /* 底部統計 */
-        .footer-stats {
-            position: fixed; bottom: 0; left: 0; width: 100%;
-            background-color: #263238;
-            border-top: 3px solid var(--accent-cyan);
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            padding: 15px 5px;
-            z-index: 100;
-        }
-        .stat-box { text-align: center; border-right: 1px solid var(--border); }
-        .stat-box:last-child { border-right: none; }
-        .stat-label { color: var(--text-muted); font-size: 0.75rem; margin-bottom: 3px; }
-        .stat-val { font-size: 1.2rem; font-weight: bold; color: white; }
-        .stat-val.avg { color: var(--accent-gold); font-size: 1.4rem; }
-
-        .fab-add {
-            position: fixed; bottom: 100px; right: 20px;
-            width: 50px; height: 50px; border-radius: 50%;
-            background: var(--accent-gold); color: #2d3e46;
-            font-size: 30px; border: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            cursor: pointer; z-index: 101;
-            display: flex; align-items: center; justify-content: center;
-        }
 
         /* RWD */
         @media (max-width: 600px) {
@@ -162,334 +122,289 @@
                 grid-template-areas: "idx name score" "idx info score";
                 gap: 5px;
             }
-            .course-index { grid-area: idx; align-self: start; padding-top: 8px; }
             .input-name { grid-area: name; font-size: 1.1rem; }
-            .mobile-info { 
-                grid-area: info; display: flex; gap: 10px; 
-                font-size: 0.85rem; color: var(--text-muted);
-            }
+            .mobile-info { grid-area: info; display: flex; gap: 10px; font-size: 0.85rem; color: var(--text-muted); }
             .score-display { grid-area: score; text-align: right; min-width: 40px; }
             .desktop-only { display: none; }
-            .comp-row { margin-left: 0; }
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .footer-stats {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background-color: #263238;
+            border-top: 3px solid var(--accent-cyan);
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            padding: 15px 5px; z-index: 100;
+        }
+        .stat-box { text-align: center; border-right: 1px solid var(--border); }
+        .stat-label { color: var(--text-muted); font-size: 0.75rem; }
+        .stat-val { font-size: 1.2rem; font-weight: bold; color: white; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>學期成績計算</h2>
+    <h2>學期成績計算 (OCR 強力版)</h2>
 
     <div class="controls">
         <button class="btn-ocr" onclick="document.getElementById('fileInput').click()">
-            📷 截圖識別
+            📷 上傳截圖 (自動增強對比)
         </button>
         <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleImage(this)">
+        
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="ocr-status" id="ocrStatus">請上傳成績單截圖，系統會自動處理黑底圖片</div>
+        <textarea id="debugText" readonly placeholder="這裡會顯示 AI 看到的原始文字，如果辨識失敗請查看這裡..."></textarea>
     </div>
-
-    <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-    <div class="ocr-status" id="ocrStatus"></div>
 
     <div class="list-header">
         <div>#</div><div>課程名稱</div><div>修別</div><div>學分</div><div>總分</div><div></div>
     </div>
-
     <div id="courseList"></div>
-    <div id="emptyMsg" class="empty-state">目前無資料<br>請點擊右下角「+」或上方「截圖識別」</div>
-
-    <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;">
-        <button onclick="clearAll()" style="background:none; border:none; color: #666; text-decoration:underline; cursor:pointer;">清空所有資料</button>
-    </div>
+    <div id="emptyMsg" style="text-align:center; padding:30px; color:#888;">目前無資料</div>
 </div>
 
 <div class="footer-stats">
     <div class="stat-box"><div class="stat-label">總學分</div><div class="stat-val" id="totalCredits">0</div></div>
-    <div class="stat-box"><div class="stat-label">實得學分</div><div class="stat-val" id="earnedCredits">0</div></div>
-    <div class="stat-box"><div class="stat-label">不及格</div><div class="stat-val" id="failedCredits" style="color:var(--accent-red)">0</div></div>
-    <div class="stat-box"><div class="stat-label">學期平均</div><div class="stat-val avg" id="semesterAvg">0.0</div></div>
+    <div class="stat-box"><div class="stat-label">實得</div><div class="stat-val" id="earnedCredits">0</div></div>
+    <div class="stat-box"><div class="stat-label">不及格</div><div class="stat-val" id="failedCredits" style="color:#ff6b6b">0</div></div>
+    <div class="stat-box"><div class="stat-label">平均</div><div class="stat-val" id="semesterAvg" style="color:#ffd700">0.0</div></div>
 </div>
 
-<button class="fab-add" onclick="addCourse()">+</button>
-
 <script>
-    // 預設為空陣列
-    let courses = JSON.parse(localStorage.getItem('myGrades_clean')) || [];
+    let courses = [];
 
-    // --- 核心渲染與計算 ---
-    function render() {
-        const list = document.getElementById('courseList');
-        const emptyMsg = document.getElementById('emptyMsg');
-        
-        // 切換顯示狀態
-        if (courses.length === 0) {
-            list.innerHTML = '';
-            emptyMsg.style.display = 'block';
-            updateFooterStats(0, 0, 0, 0);
-            return;
-        } else {
-            emptyMsg.style.display = 'none';
-        }
-
-        // 只有當列表長度改變時，才完全重建 DOM (避免輸入中斷)
-        // 這裡採用簡單策略：如果 list 內元素數量跟數據不符，就重建。
-        // 如果符合，我們假設是更新操作，這部分在 update 函數處理。
-        // 但為了代碼簡單且避免 OCR 後出錯，這裡還是每次 render 都重建
-        // **修正**：為了不卡頓，輸入框不綁定 oninput -> render，而是 oninput -> updateData -> updateSingleRow
-        
-        list.innerHTML = ''; 
-        let totalCr = 0, earnedCr = 0, failedCr = 0, weightedScoreSum = 0, validCredits = 0;
-
-        courses.forEach((c, idx) => {
-            // 計算數值
-            const stats = calcCourseStats(c);
-            
-            totalCr += stats.credit;
-            if (stats.finalScore >= 60) earnedCr += stats.credit;
-            else if(stats.credit > 0) failedCr += stats.credit;
-
-            if (stats.credit > 0) {
-                weightedScoreSum += stats.finalScore * stats.credit;
-                validCredits += stats.credit;
-            }
-
-            // 建立 HTML
-            const item = document.createElement('div');
-            item.className = 'course-item';
-            item.innerHTML = `
-                <div class="course-summary" onclick="toggleCalc(${idx})">
-                    <div class="course-index">${idx + 1}</div>
-                    <div style="width:100%">
-                        <input type="text" class="input-name" value="${c.name}" onclick="event.stopPropagation()"
-                            oninput="updateField(${idx}, 'name', this.value)">
-                        <div class="mobile-info" style="display:${window.innerWidth<=600?'flex':'none'}">
-                            <span>${c.type}修</span>
-                            <span>${c.credit}學分</span>
-                        </div>
-                    </div>
-                    <div class="desktop-only">
-                        <select oninput="updateField(${idx}, 'type', this.value)" onclick="event.stopPropagation()">
-                            <option value="必" ${c.type==='必'?'selected':''}>必</option>
-                            <option value="選" ${c.type==='選'?'selected':''}>選</option>
-                        </select>
-                    </div>
-                    <div class="desktop-only">
-                        <input type="number" value="${c.credit}" onclick="event.stopPropagation()"
-                            oninput="updateField(${idx}, 'credit', this.value)">
-                    </div>
-                    <div class="score-display" id="score-disp-${idx}" style="color:${stats.finalScore<60?'#ff6b6b':'#fff'}">
-                        ${stats.totalWeight > 0 ? stats.finalScore : '-'}
-                    </div>
-                    <button onclick="delCourse(event, ${idx})" style="border:none; background:none; color:#666; cursor:pointer;">×</button>
-                </div>
-                <div class="calc-area" id="calc-${idx}">
-                    <div style="margin-bottom:8px; color:#aaa; font-size:0.85rem;">
-                        配分設定 (目前合計: <span id="weight-alert-${idx}" style="color:${stats.totalWeight!==100?'#ff6b6b':'#4ecdc4'}">${stats.totalWeight}%</span>)
-                    </div>
-                    <div id="comps-${idx}">
-                        ${c.components.map((comp, cIdx) => `
-                            <div class="comp-row">
-                                <input type="text" style="flex:2" placeholder="項目" value="${comp.name}" 
-                                    oninput="updateComp(${idx}, ${cIdx}, 'name', this.value)">
-                                <input type="number" style="flex:1" placeholder="分數" value="${comp.score}" 
-                                    oninput="updateComp(${idx}, ${cIdx}, 'score', this.value)">
-                                <input type="number" style="flex:1" placeholder="%" value="${comp.weight}" 
-                                    oninput="updateComp(${idx}, ${cIdx}, 'weight', this.value)">
-                                <button onclick="delComp(${idx}, ${cIdx})" style="color:#ff6b6b; border:none; background:none;">×</button>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div style="margin-top:10px; margin-left:30px;">
-                        <button onclick="addComp(${idx})" style="background:none; border:1px dashed #666; color:#aaa; padding:5px 10px; border-radius:4px; cursor:pointer;">+ 新增項目</button>
-                    </div>
-                </div>
-            `;
-            list.appendChild(item);
-        });
-
-        const avg = validCredits > 0 ? (weightedScoreSum / validCredits) : 0;
-        updateFooterStats(totalCr, earnedCr, failedCr, avg);
-    }
-
-    // --- 計算輔助 ---
-    function calcCourseStats(c) {
-        let score = 0, weight = 0;
-        c.components.forEach(comp => {
-            score += (parseFloat(comp.score)||0) * ((parseFloat(comp.weight)||0)/100);
-            weight += (parseFloat(comp.weight)||0);
-        });
-        return {
-            finalScore: Math.round(score),
-            totalWeight: weight,
-            credit: parseFloat(c.credit) || 0
-        };
-    }
-
-    function updateFooterStats(total, earned, failed, avg) {
-        document.getElementById('totalCredits').innerText = total;
-        document.getElementById('earnedCredits').innerText = earned;
-        document.getElementById('failedCredits').innerText = failed;
-        document.getElementById('semesterAvg').innerText = avg.toFixed(2);
-    }
-
-    function recalculateAll() {
-        let totalCr = 0, earnedCr = 0, failedCr = 0, weightedScoreSum = 0, validCredits = 0;
-        courses.forEach(c => {
-            const stats = calcCourseStats(c);
-            totalCr += stats.credit;
-            if (stats.finalScore >= 60) earnedCr += stats.credit;
-            else if(stats.credit > 0) failedCr += stats.credit;
-            if (stats.credit > 0) {
-                weightedScoreSum += stats.finalScore * stats.credit;
-                validCredits += stats.credit;
-            }
-        });
-        const avg = validCredits > 0 ? (weightedScoreSum / validCredits) : 0;
-        updateFooterStats(totalCr, earnedCr, failedCr, avg);
-    }
-
-    // --- 資料操作 (不重繪 DOM) ---
-    function updateField(idx, key, val) {
-        courses[idx][key] = val;
-        save();
-        recalculateAll(); // 只更新底部統計
-    }
-
-    function updateComp(idx, cIdx, key, val) {
-        courses[idx].components[cIdx][key] = val;
-        save();
-        
-        // 局部更新該行顯示，不重繪整個列表
-        const stats = calcCourseStats(courses[idx]);
-        const scoreDisp = document.getElementById(`score-disp-${idx}`);
-        const weightAlert = document.getElementById(`weight-alert-${idx}`);
-        
-        if (scoreDisp) {
-            scoreDisp.innerText = stats.totalWeight > 0 ? stats.finalScore : '-';
-            scoreDisp.style.color = stats.finalScore < 60 ? '#ff6b6b' : '#fff';
-        }
-        if (weightAlert) {
-            weightAlert.innerText = stats.totalWeight + '%';
-            weightAlert.style.color = stats.totalWeight !== 100 ? '#ff6b6b' : '#4ecdc4';
-        }
-        recalculateAll();
-    }
-
-    // --- 增刪操作 (需重繪) ---
-    function addCourse() {
-        courses.push({
-            id: Date.now(), name: '', type: '必', credit: 3,
-            components: [{name:'期中', score:'', weight:30}, {name:'期末', score:'', weight:40}, {name:'平時', score:'', weight:30}]
-        });
-        render();
-        setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
-        save();
-    }
-
-    function delCourse(e, idx) {
-        e.stopPropagation();
-        if(confirm('刪除此課程？')) { courses.splice(idx, 1); render(); save(); }
-    }
-
-    function addComp(idx) {
-        courses[idx].components.push({name:'', score:'', weight:''});
-        render();
-        setTimeout(() => document.getElementById(`calc-${idx}`).style.display='block', 50); // 保持展開
-        save();
-    }
-
-    function delComp(idx, cIdx) {
-        courses[idx].components.splice(cIdx, 1);
-        render();
-        setTimeout(() => document.getElementById(`calc-${idx}`).style.display='block', 50);
-        save();
-    }
-
-    function clearAll() {
-        if(confirm('確定清空所有資料？')) { courses = []; render(); save(); }
-    }
-
-    function save() {
-        localStorage.setItem('myGrades_clean', JSON.stringify(courses));
-    }
-
-    function toggleCalc(idx) {
-        if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName)) return;
-        const el = document.getElementById(`calc-${idx}`);
-        const isHidden = el.style.display === 'none' || !el.style.display;
-        document.querySelectorAll('.calc-area').forEach(d => d.style.display='none'); // 收起其他
-        if(isHidden) {
-            el.style.display = 'block';
-            el.classList.add('calc-active');
-        }
-    }
-
-    // --- OCR 邏輯 ---
+    // --- 圖像處理核心 ---
     async function handleImage(input) {
         if (!input.files[0]) return;
         const status = document.getElementById('ocrStatus');
         const bar = document.getElementById('progressBar');
         const fill = document.getElementById('progressFill');
+        const debugArea = document.getElementById('debugText');
         
         bar.style.display = 'block';
-        status.innerText = "正在初始化識別引擎...";
+        debugArea.style.display = 'none';
+        status.innerText = "正在處理圖片 (反轉顏色)...";
 
         try {
+            // 1. 預處理圖片：反轉顏色 (解決深色模式問題)
+            const processedImage = await preprocessImage(input.files[0]);
+
+            // 2. 啟動 Tesseract
+            status.innerText = "啟動識別引擎...";
             const worker = Tesseract.createWorker({
                 logger: m => {
                     if(m.status === 'recognizing text') {
                         fill.style.width = `${m.progress * 100}%`;
-                        status.innerText = `讀取中... ${Math.round(m.progress * 100)}%`;
+                        status.innerText = `AI 讀取中... ${Math.round(m.progress * 100)}%`;
                     }
                 }
             });
+            
             await worker.load();
             await worker.loadLanguage('chi_tra');
             await worker.initialize('chi_tra');
 
-            const { data: { text } } = await worker.recognize(input.files[0]);
-            const newCourses = parseScheduleText(text);
+            // 3. 識別
+            const { data: { text } } = await worker.recognize(processedImage);
             await worker.terminate();
+
+            // 4. 顯示原始文字供除錯
+            console.log("Raw OCR Text:", text);
+            debugArea.value = "--- 原始識別結果 (供參考) ---\n" + text;
+            debugArea.style.display = 'block';
+
+            // 5. 解析
+            const newCourses = parseLooseText(text);
 
             if (newCourses.length > 0) {
                 courses = [...courses, ...newCourses];
                 render();
-                save();
-                alert(`識別成功！已新增 ${newCourses.length} 門課程。`);
+                status.innerText = `成功！抓取到 ${newCourses.length} 筆資料。`;
             } else {
-                alert("無法識別課程，請確認圖片清晰度。");
+                status.innerText = "❌ 識別失敗。請查看下方黑色區塊的原始文字，若全是亂碼代表圖片太模糊。";
             }
+
         } catch (e) {
-            alert("錯誤：" + e.message);
+            status.innerText = "錯誤：" + e.message;
+            console.error(e);
         } finally {
             bar.style.display = 'none';
-            status.innerText = "";
-            input.value = ''; // 重置 input 以便重複上傳
+            input.value = ''; // 重置
         }
     }
 
-    function parseScheduleText(text) {
+    // 圖片預處理：將圖片畫到 Canvas 上並反轉顏色
+    function preprocessImage(file) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // 取得像素資料
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                // 簡單判斷是否為深色模式 (取樣中間一點)
+                // 如果 R,G,B 都很小 (<100)，假設是深色背景，執行反色
+                // 這裡我們直接強制反色測試，或者做智慧判斷。
+                // 為了保險，我們檢查整張圖的平均亮度
+                let totalBrightness = 0;
+                for(let i=0; i<data.length; i+=40) { // 取樣加速
+                    totalBrightness += (data[i] + data[i+1] + data[i+2]) / 3;
+                }
+                const avgBrightness = totalBrightness / (data.length / 40);
+
+                if (avgBrightness < 128) {
+                    console.log("偵測到深色圖片，正在反轉顏色...");
+                    for (let i = 0; i < data.length; i += 4) {
+                        data[i] = 255 - data[i];     // R
+                        data[i + 1] = 255 - data[i + 1]; // G
+                        data[i + 2] = 255 - data[i + 2]; // B
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                }
+                
+                resolve(canvas.toDataURL());
+            };
+            img.src = URL.createObjectURL(file);
+        });
+    }
+
+    // 寬鬆解析邏輯
+    function parseLooseText(text) {
         const lines = text.split('\n');
         const result = [];
+
         lines.forEach(line => {
-            let clean = line.trim().replace(/\s+/g, ' '); 
-            // 規則：抓取結尾是 "必/選 N/N" 或 "必/選 N" 的行
-            const regex = /([^\s\d].*?)\s+.*?(必|選)\s+(\d)(\/\d)?$/;
-            const match = clean.match(regex);
-            if (match) {
-                let name = match[1].split('星期')[0].trim();
-                result.push({
-                    id: Date.now() + Math.random(),
-                    name: name,
-                    type: match[2],
-                    credit: parseInt(match[3]),
-                    components: [{ name: '期末', score: '', weight: 100 }]
-                });
+            // 移除所有空白，避免 OCR 產生的空格干擾
+            // 但保留數字間的區隔，所以先把連續空白變成一個空格
+            let clean = line.trim().replace(/\s+/g, ' ');
+
+            // 策略：尋找一行裡面同時出現 "必" 或 "選"，以及一個 "數字"
+            // 很多時候 OCR 會把 "必 3" 看成 "必3"
+            if (clean.includes('必') || clean.includes('選')) {
+                
+                // 嘗試抓取學分 (通常是 0, 1, 2, 3, 4)
+                // 找 "必" 或 "選" 後面跟著的數字
+                let creditMatch = clean.match(/(必|選).*?(\d)/);
+                
+                // 如果沒抓到，試試看前面有沒有數字 (有時候排版問題)
+                if (!creditMatch) {
+                    creditMatch = clean.match(/(\d).*?(必|選)/);
+                }
+
+                if (creditMatch) {
+                    // 假設這行是課程
+                    // 把名字抓出來 (把必/選/數字/亂碼濾掉剩下的長字串)
+                    // 這比較難精準，我們先用分割法
+                    
+                    let parts = clean.split(' ');
+                    // 通常最長的那一段是課名
+                    let name = parts.reduce((a, b) => a.length > b.length ? a : b, '');
+                    
+                    // 修正 OCR 常見錯字
+                    name = name.replace(/[^\u4e00-\u9fa5a-zA-Z\(\)]/g, ''); // 只留中英文括號
+
+                    let type = clean.includes('必') ? '必' : '選';
+                    // 抓到的數字
+                    let credit = parseInt(clean.match(/\d/)[0]); 
+
+                    // 簡單過濾：學分不太可能大於 6 或小於 0
+                    if (credit >= 0 && credit <= 6 && name.length > 1) {
+                        result.push({
+                            id: Date.now() + Math.random(),
+                            name: name,
+                            type: type,
+                            credit: credit,
+                            components: [{ name: '期末', score: '', weight: 100 }]
+                        });
+                    }
+                }
             }
         });
         return result;
     }
 
-    // 啟動
+    // --- 介面渲染 (與之前相同) ---
+    function render() {
+        const list = document.getElementById('courseList');
+        const emptyMsg = document.getElementById('emptyMsg');
+        
+        if(courses.length === 0) {
+            list.innerHTML = '';
+            emptyMsg.style.display = 'block';
+            updateFooter(0,0,0,0);
+            return;
+        }
+        emptyMsg.style.display = 'none';
+        list.innerHTML = '';
+
+        let totalCr=0, earnedCr=0, failedCr=0, wScore=0, validCr=0;
+
+        courses.forEach((c, idx) => {
+            // 算分
+            let score=0, weight=0;
+            c.components.forEach(cmp => {
+                score += (parseFloat(cmp.score)||0)*(parseFloat(cmp.weight||0)/100);
+                weight += parseFloat(cmp.weight)||0;
+            });
+            const final = Math.round(score);
+            const cr = parseFloat(c.credit)||0;
+
+            totalCr += cr;
+            if(final>=60) earnedCr += cr;
+            else if(cr>0) failedCr += cr;
+
+            if(cr>0) { wScore += final*cr; validCr += cr; }
+
+            // UI
+            const div = document.createElement('div');
+            div.className = 'course-item';
+            div.innerHTML = `
+                <div class="course-summary">
+                    <div style="text-align:center; color:#888;">${idx+1}</div>
+                    <div>
+                        <input type="text" class="input-name" value="${c.name}" onchange="upd(${idx}, 'name', this.value)">
+                        <div class="mobile-info" style="display:${window.innerWidth<=600?'flex':'none'}">
+                            <span>${c.type}</span> <span>${c.credit}學分</span>
+                        </div>
+                    </div>
+                    <div class="desktop-only">
+                        <select onchange="upd(${idx}, 'type', this.value)">
+                            <option value="必" ${c.type==='必'?'selected':''}>必</option>
+                            <option value="選" ${c.type==='選'?'selected':''}>選</option>
+                        </select>
+                    </div>
+                    <div class="desktop-only">
+                        <input type="number" value="${c.credit}" onchange="upd(${idx}, 'credit', this.value)">
+                    </div>
+                    <div class="score-display" style="color:${final<60?'#ff6b6b':'#fff'}">
+                        ${weight>0?final:'-'}
+                    </div>
+                    <button onclick="del(${idx})" style="background:none; border:none; color:#666;">×</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+
+        const avg = validCr>0 ? (wScore/validCr) : 0;
+        updateFooter(totalCr, earnedCr, failedCr, avg);
+    }
+
+    function updateFooter(t, e, f, a) {
+        document.getElementById('totalCredits').innerText = t;
+        document.getElementById('earnedCredits').innerText = e;
+        document.getElementById('failedCredits').innerText = f;
+        document.getElementById('semesterAvg').innerText = a.toFixed(2);
+    }
+
+    function upd(idx, key, val) { courses[idx][key] = val; render(); }
+    function del(idx) { if(confirm('刪除?')) { courses.splice(idx,1); render(); } }
+
     render();
 </script>
 
