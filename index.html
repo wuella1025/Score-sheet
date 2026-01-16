@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>學期成績計算 (OCR 修復版)</title>
+    <title>學期成績計算 (PDF/圖片全能版)</title>
+    
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
     <style>
         :root {
             --bg-body: #2d3e46;
@@ -32,17 +35,18 @@
         .container { max-width: 800px; margin: 0 auto; }
         h2 { text-align: center; color: var(--text-main); margin-bottom: 15px; }
 
-        /* OCR 控制區 */
+        /* 控制區 */
         .controls {
             background: rgba(0,0,0,0.2);
-            padding: 15px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
             text-align: center;
+            border: 1px dashed var(--border);
         }
 
         .btn-ocr {
-            background: var(--accent-cyan);
+            background: linear-gradient(135deg, #4ecdc4, #26a69a);
             color: #2d3e46;
             border: none;
             padding: 12px 24px;
@@ -50,27 +54,23 @@
             font-weight: bold;
             font-size: 1rem;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(78, 205, 196, 0.3);
+            box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
             display: inline-flex; align-items: center; gap: 8px;
+            transition: transform 0.2s;
         }
+        .btn-ocr:active { transform: scale(0.95); }
 
-        /* 狀態與除錯顯示 */
-        .ocr-status { margin-top: 10px; font-size: 0.9rem; color: var(--accent-cyan); min-height: 20px; }
-        .progress-bar { width: 100%; height: 6px; background: #333; margin-top: 10px; border-radius: 3px; overflow: hidden; display: none; }
-        .progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s; }
+        .file-hint { font-size: 0.8rem; color: #aaa; margin-top: 8px; }
+
+        /* 狀態顯示 */
+        .ocr-status { margin-top: 15px; font-size: 0.9rem; color: var(--accent-cyan); font-weight: bold; min-height: 20px; }
+        .progress-bar { width: 100%; height: 6px; background: #222; margin-top: 10px; border-radius: 3px; overflow: hidden; display: none; }
+        .progress-fill { width: 0%; height: 100%; background: var(--accent-gold); transition: width 0.3s; }
         
         #debugText {
-            display: none;
-            width: 100%;
-            height: 100px;
-            background: #222;
-            color: #0f0;
-            font-family: monospace;
-            font-size: 0.8rem;
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #444;
-            overflow-y: scroll;
+            display: none; width: 100%; height: 120px; background: #111; color: #0f0;
+            font-family: monospace; font-size: 0.8rem; margin-top: 15px; padding: 10px;
+            border: 1px solid #444; overflow-y: scroll; border-radius: 6px;
         }
 
         /* 列表樣式 */
@@ -91,6 +91,7 @@
             border-bottom: 1px solid var(--border);
             margin-bottom: 2px;
             border-radius: 4px;
+            animation: fadeIn 0.3s;
         }
         .course-summary {
             display: grid;
@@ -100,15 +101,8 @@
         }
 
         input, select {
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--text-main);
-            font-size: 1rem;
-            width: 100%;
-            padding: 5px;
-            border-radius: 4px;
-            outline: none;
-            text-align: center;
+            background: transparent; border: 1px solid transparent; color: var(--text-main);
+            font-size: 1rem; width: 100%; padding: 5px; border-radius: 4px; outline: none; text-align: center;
         }
         .input-name { text-align: left; font-weight: bold; }
         input:focus { background: var(--input-bg); border-bottom: 2px solid var(--accent-cyan); }
@@ -133,27 +127,32 @@
             background-color: #263238;
             border-top: 3px solid var(--accent-cyan);
             display: grid; grid-template-columns: repeat(4, 1fr);
-            padding: 15px 5px; z-index: 100;
+            padding: 15px 5px; z-index: 100; box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
         }
         .stat-box { text-align: center; border-right: 1px solid var(--border); }
         .stat-label { color: var(--text-muted); font-size: 0.75rem; }
         .stat-val { font-size: 1.2rem; font-weight: bold; color: white; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>學期成績計算 (OCR 強力版)</h2>
+    <h2>學期成績計算 (全能版)</h2>
 
     <div class="controls">
         <button class="btn-ocr" onclick="document.getElementById('fileInput').click()">
-            📷 上傳截圖 (自動增強對比)
+            📂 上傳 PDF 或 圖片
         </button>
-        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleImage(this)">
+        <input type="file" id="fileInput" accept="image/*, application/pdf" style="display:none" onchange="handleFile(this)">
         
+        <div class="file-hint">支援：.pdf, .jpg, .png (自動處理黑底)</div>
+
         <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-        <div class="ocr-status" id="ocrStatus">請上傳成績單截圖，系統會自動處理黑底圖片</div>
-        <textarea id="debugText" readonly placeholder="這裡會顯示 AI 看到的原始文字，如果辨識失敗請查看這裡..."></textarea>
+        <div class="ocr-status" id="ocrStatus">請上傳您的成績單</div>
+        
+        <textarea id="debugText" readonly placeholder="這裡會顯示 AI 讀取到的原始文字..."></textarea>
     </div>
 
     <div class="list-header">
@@ -161,6 +160,10 @@
     </div>
     <div id="courseList"></div>
     <div id="emptyMsg" style="text-align:center; padding:30px; color:#888;">目前無資料</div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+         <button onclick="if(confirm('清空?')){courses=[]; render();}" style="background:none; border:none; color:#666; text-decoration:underline;">重置</button>
+    </div>
 </div>
 
 <div class="footer-stats">
@@ -171,70 +174,119 @@
 </div>
 
 <script>
+    // 設定 PDF.js 的 Worker (這是解析 PDF 必須的)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
     let courses = [];
 
-    // --- 圖像處理核心 ---
-    async function handleImage(input) {
+    // --- 檔案處理入口 ---
+    async function handleFile(input) {
         if (!input.files[0]) return;
+        const file = input.files[0];
+        
         const status = document.getElementById('ocrStatus');
         const bar = document.getElementById('progressBar');
         const fill = document.getElementById('progressFill');
         const debugArea = document.getElementById('debugText');
         
         bar.style.display = 'block';
+        fill.style.width = '10%';
         debugArea.style.display = 'none';
-        status.innerText = "正在處理圖片 (反轉顏色)...";
+        debugArea.value = '';
+        status.innerText = "正在分析檔案...";
 
         try {
-            // 1. 預處理圖片：反轉顏色 (解決深色模式問題)
-            const processedImage = await preprocessImage(input.files[0]);
+            let imagesToProcess = [];
 
-            // 2. 啟動 Tesseract
-            status.innerText = "啟動識別引擎...";
+            // 1. 判斷檔案類型
+            if (file.type === 'application/pdf') {
+                status.innerText = "偵測到 PDF，正在轉換為圖片...";
+                imagesToProcess = await convertPdfToImages(file);
+            } else {
+                status.innerText = "偵測到圖片，正在預處理...";
+                // 圖片直接讀取並預處理 (反色)
+                const imgDataUrl = await preprocessImage(file);
+                imagesToProcess = [imgDataUrl];
+            }
+
+            // 2. 開始 OCR 辨識 (支援多頁)
+            status.innerText = "啟動 AI 識別引擎...";
             const worker = Tesseract.createWorker({
                 logger: m => {
                     if(m.status === 'recognizing text') {
                         fill.style.width = `${m.progress * 100}%`;
-                        status.innerText = `AI 讀取中... ${Math.round(m.progress * 100)}%`;
+                        status.innerText = `讀取文字中... ${Math.round(m.progress * 100)}%`;
                     }
                 }
             });
-            
+
             await worker.load();
             await worker.loadLanguage('chi_tra');
             await worker.initialize('chi_tra');
 
-            // 3. 識別
-            const { data: { text } } = await worker.recognize(processedImage);
+            let fullText = "";
+            
+            // 逐頁辨識
+            for (let i = 0; i < imagesToProcess.length; i++) {
+                if(imagesToProcess.length > 1) status.innerText = `正在讀取第 ${i+1} 頁...`;
+                const { data: { text } } = await worker.recognize(imagesToProcess[i]);
+                fullText += text + "\n";
+            }
+            
             await worker.terminate();
 
-            // 4. 顯示原始文字供除錯
-            console.log("Raw OCR Text:", text);
-            debugArea.value = "--- 原始識別結果 (供參考) ---\n" + text;
+            // 3. 顯示結果與解析
+            console.log("Full OCR Text:", fullText);
+            debugArea.value = fullText;
             debugArea.style.display = 'block';
 
-            // 5. 解析
-            const newCourses = parseLooseText(text);
+            const newCourses = parseLooseText(fullText);
 
             if (newCourses.length > 0) {
                 courses = [...courses, ...newCourses];
                 render();
-                status.innerText = `成功！抓取到 ${newCourses.length} 筆資料。`;
+                status.innerText = `成功匯入！共 ${newCourses.length} 門課程。`;
             } else {
-                status.innerText = "❌ 識別失敗。請查看下方黑色區塊的原始文字，若全是亂碼代表圖片太模糊。";
+                status.innerText = "❌ 未找到課程資料，請檢查下方原始文字是否為亂碼。";
             }
 
         } catch (e) {
-            status.innerText = "錯誤：" + e.message;
+            status.innerText = "發生錯誤：" + e.message;
             console.error(e);
         } finally {
-            bar.style.display = 'none';
-            input.value = ''; // 重置
+            setTimeout(() => bar.style.display = 'none', 3000);
+            input.value = ''; 
         }
     }
 
-    // 圖片預處理：將圖片畫到 Canvas 上並反轉顏色
-    function preprocessImage(file) {
+    // --- PDF 轉圖片核心邏輯 ---
+    async function convertPdfToImages(file) {
+        const fileData = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(fileData).promise;
+        const images = [];
+
+        // 讀取每一頁
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 }); // 放大 2 倍以提高清晰度
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            
+            // 將 Canvas 轉為圖片並進行反色檢查
+            // 這裡我們把 canvas 轉成 Blob 傳給預處理函數
+            const blob = await new Promise(r => canvas.toBlob(r));
+            const processedImg = await preprocessImage(blob);
+            images.push(processedImg);
+        }
+        return images;
+    }
+
+    // --- 圖像增強 (反色) ---
+    function preprocessImage(fileOrBlob) {
         return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
@@ -244,82 +296,56 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
                 
-                // 取得像素資料
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const data = imageData.data;
                 
-                // 簡單判斷是否為深色模式 (取樣中間一點)
-                // 如果 R,G,B 都很小 (<100)，假設是深色背景，執行反色
-                // 這裡我們直接強制反色測試，或者做智慧判斷。
-                // 為了保險，我們檢查整張圖的平均亮度
+                // 檢查是否為深色背景 (取樣)
                 let totalBrightness = 0;
-                for(let i=0; i<data.length; i+=40) { // 取樣加速
+                let samples = 0;
+                for(let i=0; i<data.length; i+=100) { 
                     totalBrightness += (data[i] + data[i+1] + data[i+2]) / 3;
+                    samples++;
                 }
-                const avgBrightness = totalBrightness / (data.length / 40);
+                const avg = totalBrightness / samples;
 
-                if (avgBrightness < 128) {
-                    console.log("偵測到深色圖片，正在反轉顏色...");
+                if (avg < 128) {
+                    // 執行反色
                     for (let i = 0; i < data.length; i += 4) {
-                        data[i] = 255 - data[i];     // R
-                        data[i + 1] = 255 - data[i + 1]; // G
-                        data[i + 2] = 255 - data[i + 2]; // B
+                        data[i] = 255 - data[i];
+                        data[i + 1] = 255 - data[i + 1];
+                        data[i + 2] = 255 - data[i + 2];
                     }
                     ctx.putImageData(imageData, 0, 0);
                 }
-                
-                resolve(canvas.toDataURL());
+                resolve(canvas.toDataURL('image/png'));
             };
-            img.src = URL.createObjectURL(file);
+            img.src = URL.createObjectURL(fileOrBlob);
         });
     }
 
-    // 寬鬆解析邏輯
+    // --- 解析邏輯 (寬鬆模式) ---
     function parseLooseText(text) {
         const lines = text.split('\n');
         const result = [];
-
         lines.forEach(line => {
-            // 移除所有空白，避免 OCR 產生的空格干擾
-            // 但保留數字間的區隔，所以先把連續空白變成一個空格
             let clean = line.trim().replace(/\s+/g, ' ');
-
-            // 策略：尋找一行裡面同時出現 "必" 或 "選"，以及一個 "數字"
-            // 很多時候 OCR 會把 "必 3" 看成 "必3"
+            // 邏輯：找一行裡面有「必/選」且有「數字」
             if (clean.includes('必') || clean.includes('選')) {
-                
-                // 嘗試抓取學分 (通常是 0, 1, 2, 3, 4)
-                // 找 "必" 或 "選" 後面跟著的數字
-                let creditMatch = clean.match(/(必|選).*?(\d)/);
-                
-                // 如果沒抓到，試試看前面有沒有數字 (有時候排版問題)
-                if (!creditMatch) {
-                    creditMatch = clean.match(/(\d).*?(必|選)/);
-                }
-
+                // 找學分 (0-9)
+                let creditMatch = clean.match(/(必|選).*?(\d)/) || clean.match(/(\d).*?(必|選)/);
                 if (creditMatch) {
-                    // 假設這行是課程
-                    // 把名字抓出來 (把必/選/數字/亂碼濾掉剩下的長字串)
-                    // 這比較難精準，我們先用分割法
-                    
+                    // 嘗試提取名稱 (最長的那段文字)
                     let parts = clean.split(' ');
-                    // 通常最長的那一段是課名
                     let name = parts.reduce((a, b) => a.length > b.length ? a : b, '');
+                    name = name.replace(/[^\u4e00-\u9fa5a-zA-Z\(\)\-]/g, ''); // 清理雜訊
                     
-                    // 修正 OCR 常見錯字
-                    name = name.replace(/[^\u4e00-\u9fa5a-zA-Z\(\)]/g, ''); // 只留中英文括號
-
                     let type = clean.includes('必') ? '必' : '選';
-                    // 抓到的數字
-                    let credit = parseInt(clean.match(/\d/)[0]); 
-
-                    // 簡單過濾：學分不太可能大於 6 或小於 0
-                    if (credit >= 0 && credit <= 6 && name.length > 1) {
+                    let credit = parseInt(clean.match(/\d/)[0]);
+                    
+                    if (credit >= 0 && credit <= 10 && name.length > 1) {
                         result.push({
                             id: Date.now() + Math.random(),
-                            name: name,
-                            type: type,
-                            credit: credit,
+                            name: name, type: type, credit: credit,
                             components: [{ name: '期末', score: '', weight: 100 }]
                         });
                     }
@@ -329,7 +355,7 @@
         return result;
     }
 
-    // --- 介面渲染 (與之前相同) ---
+    // --- UI 渲染與計算 ---
     function render() {
         const list = document.getElementById('courseList');
         const emptyMsg = document.getElementById('emptyMsg');
@@ -343,67 +369,62 @@
         emptyMsg.style.display = 'none';
         list.innerHTML = '';
 
-        let totalCr=0, earnedCr=0, failedCr=0, wScore=0, validCr=0;
+        let tCr=0, eCr=0, fCr=0, wS=0, vCr=0;
 
         courses.forEach((c, idx) => {
-            // 算分
-            let score=0, weight=0;
+            let s=0, w=0;
             c.components.forEach(cmp => {
-                score += (parseFloat(cmp.score)||0)*(parseFloat(cmp.weight||0)/100);
-                weight += parseFloat(cmp.weight)||0;
+                s += (parseFloat(cmp.score)||0)*(parseFloat(cmp.weight||0)/100);
+                w += parseFloat(cmp.weight)||0;
             });
-            const final = Math.round(score);
+            const final = Math.round(s);
             const cr = parseFloat(c.credit)||0;
 
-            totalCr += cr;
-            if(final>=60) earnedCr += cr;
-            else if(cr>0) failedCr += cr;
+            tCr += cr;
+            if(final>=60) eCr += cr;
+            else if(cr>0) fCr += cr;
+            if(cr>0) { wS += final*cr; vCr += cr; }
 
-            if(cr>0) { wScore += final*cr; validCr += cr; }
-
-            // UI
             const div = document.createElement('div');
             div.className = 'course-item';
             div.innerHTML = `
                 <div class="course-summary">
                     <div style="text-align:center; color:#888;">${idx+1}</div>
                     <div>
-                        <input type="text" class="input-name" value="${c.name}" onchange="upd(${idx}, 'name', this.value)">
+                        <input type="text" class="input-name" value="${c.name}" onchange="u(${idx},'name',this.value)">
                         <div class="mobile-info" style="display:${window.innerWidth<=600?'flex':'none'}">
                             <span>${c.type}</span> <span>${c.credit}學分</span>
                         </div>
                     </div>
                     <div class="desktop-only">
-                        <select onchange="upd(${idx}, 'type', this.value)">
+                        <select onchange="u(${idx},'type',this.value)">
                             <option value="必" ${c.type==='必'?'selected':''}>必</option>
                             <option value="選" ${c.type==='選'?'selected':''}>選</option>
                         </select>
                     </div>
                     <div class="desktop-only">
-                        <input type="number" value="${c.credit}" onchange="upd(${idx}, 'credit', this.value)">
+                        <input type="number" value="${c.credit}" onchange="u(${idx},'credit',this.value)">
                     </div>
                     <div class="score-display" style="color:${final<60?'#ff6b6b':'#fff'}">
-                        ${weight>0?final:'-'}
+                        ${w>0?final:'-'}
                     </div>
-                    <button onclick="del(${idx})" style="background:none; border:none; color:#666;">×</button>
+                    <button onclick="d(${idx})" style="background:none; border:none; color:#666; cursor:pointer;">×</button>
                 </div>
             `;
             list.appendChild(div);
         });
-
-        const avg = validCr>0 ? (wScore/validCr) : 0;
-        updateFooter(totalCr, earnedCr, failedCr, avg);
+        const avg = vCr>0 ? (wS/vCr) : 0;
+        updateFooter(tCr, eCr, fCr, avg);
     }
 
-    function updateFooter(t, e, f, a) {
+    function updateFooter(t,e,f,a) {
         document.getElementById('totalCredits').innerText = t;
         document.getElementById('earnedCredits').innerText = e;
         document.getElementById('failedCredits').innerText = f;
         document.getElementById('semesterAvg').innerText = a.toFixed(2);
     }
-
-    function upd(idx, key, val) { courses[idx][key] = val; render(); }
-    function del(idx) { if(confirm('刪除?')) { courses.splice(idx,1); render(); } }
+    function u(i,k,v){ courses[i][k]=v; render(); }
+    function d(i){ if(confirm('刪除?')) { courses.splice(i,1); render(); } }
 
     render();
 </script>
