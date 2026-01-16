@@ -3,400 +3,402 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>學期成績計算機 (修正版)</title>
+    <title>AI 智慧學期成績系統</title>
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <style>
         :root {
-            --primary: #4f46e5;
-            --bg: #f3f4f6;
-            --white: #ffffff;
-            --text: #111827;
-            --border: #d1d5db;
-            --danger: #ef4444;
+            --bg-body: #2d3e46;
+            --bg-card: #3b4c54;
+            --text-main: #e0e6ed;
+            --text-muted: #aab2bd;
+            --accent-red: #ff6b6b;
+            --accent-cyan: #4ecdc4;
+            --accent-gold: #ffd700;
+            --border: #4a5d66;
+            --input-bg: #455a64;
         }
 
         * { box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
             margin: 0;
+            padding: 10px;
+            padding-bottom: 120px;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; }
+
+        h2 { text-align: center; color: var(--text-main); margin-bottom: 20px; }
+
+        /* AI 識別控制區 */
+        .ocr-section {
+            background: rgba(78, 205, 196, 0.1);
+            border: 1px dashed var(--accent-cyan);
+            border-radius: 8px;
             padding: 15px;
-            padding-bottom: 80px; /* 留給懸浮按鈕空間 */
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        /* 頂部儀表板 */
-        .dashboard {
-            background: linear-gradient(135deg, #4f46e5, #4338ca);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             margin-bottom: 20px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            text-align: center;
         }
 
-        .stat-box { text-align: center; flex: 1; }
-        .stat-val { font-size: 2rem; font-weight: 800; line-height: 1.2; }
-        .stat-label { font-size: 0.8rem; opacity: 0.9; }
-
-        /* 科目卡片 */
-        .subject-card {
-            background: var(--white);
-            border-radius: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            margin-bottom: 15px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-        }
-
-        /* 科目頭部 (藍色條) */
-        .subject-header {
-            background: #f9fafb;
-            padding: 12px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap; /* 允許換行 */
-        }
-
-        /* 輸入框樣式 - 字體設為16px防止iOS縮放 */
-        input {
-            font-size: 16px; 
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            outline: none;
-            background: #fff;
-            width: 100%;
-        }
-
-        input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2); }
-
-        .sub-name-input { flex: 2; min-width: 150px; font-weight: bold; }
-        .sub-credit-input { width: 70px; text-align: center; }
-        
-        .sub-total-display {
-            margin-left: auto;
-            text-align: right;
-            line-height: 1.2;
-        }
-        .sub-score-val { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
-        .sub-score-lbl { font-size: 0.7rem; color: #6b7280; }
-
-        .btn-del-sub {
-            background: #fee2e2;
-            color: var(--danger);
+        .btn-ocr {
+            background: var(--accent-cyan);
+            color: #2d3e46;
             border: none;
-            width: 32px;
-            height: 32px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1rem;
             cursor: pointer;
-            font-size: 1.2rem;
-        }
-
-        /* 細項列表 */
-        .components-list { padding: 10px; }
-
-        .comp-row {
-            display: flex;
+            display: inline-flex;
+            align-items: center;
             gap: 8px;
-            margin-bottom: 8px;
-            align-items: center;
+            box-shadow: 0 4px 10px rgba(78, 205, 196, 0.3);
         }
 
-        .comp-name { flex: 2; }
-        .comp-score { flex: 1; text-align: center; }
-        .comp-weight { flex: 1; text-align: center; }
+        .ocr-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--accent-cyan);
+            min-height: 20px;
+        }
 
-        .btn-del-comp {
-            background: none;
-            border: none;
-            color: #9ca3af;
-            font-size: 1.5rem;
-            padding: 0 5px;
+        #fileInput { display: none; }
+
+        /* 列表樣式 */
+        .list-header {
+            display: grid;
+            grid-template-columns: 40px 1fr 60px 60px 60px 40px;
+            padding: 10px 15px;
+            font-weight: bold;
+            color: var(--accent-gold);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .course-item {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1px;
+        }
+
+        .course-summary {
+            display: grid;
+            grid-template-columns: 40px 1fr 60px 60px 60px 40px;
+            padding: 15px;
+            align-items: center;
             cursor: pointer;
+        }
+
+        .course-index { font-family: monospace; color: var(--text-muted); }
+
+        input, select {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-main);
+            font-size: 1rem;
+            width: 100%;
+            padding: 4px;
+            border-radius: 4px;
+            outline: none;
+            text-align: center;
         }
         
-        /* 底部工具列 */
-        .comp-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 5px;
-            border-top: 1px dashed #eee;
-            margin-top: 5px;
+        .input-name { text-align: left; font-weight: bold; }
+        
+        input:focus, select:focus {
+            background: var(--input-bg);
+            border-bottom: 2px solid var(--accent-cyan);
         }
 
-        .weight-alert { font-size: 0.8rem; font-weight: bold; }
-        .btn-add-comp {
-            color: var(--primary);
-            background: none;
-            border: 1px solid var(--primary);
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            cursor: pointer;
-        }
+        .score-display { font-weight: bold; font-size: 1.1rem; }
 
-        /* 懸浮按鈕 */
-        .fab {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: var(--primary);
-            color: white;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
-            border: none;
-            cursor: pointer;
-            z-index: 101;
+        /* 統計列 */
+        .footer-stats {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background-color: #3b4c54;
+            border-top: 4px solid #546e7a;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
+            display: flex; justify-content: space-around;
+            padding: 15px 10px; z-index: 100;
         }
+        
+        .stat-group { text-align: center; display: flex; flex-direction: column; gap: 5px; }
+        .stat-label { color: var(--accent-gold); font-size: 0.8rem; font-weight: bold; }
+        .stat-value { font-size: 1.2rem; font-weight: bold; }
+        .stat-value.danger { color: var(--accent-red); }
 
-        /* 手機版面特別優化 */
+        /* 手機 RWD */
         @media (max-width: 600px) {
-            .subject-header {
-                display: grid;
-                grid-template-columns: 1fr auto auto; /* 名稱 | 分數顯示 | 刪除 */
-                grid-template-areas: 
-                    "name score del"
-                    "credit score del";
-                gap: 8px;
+            .list-header { display: none; }
+            .course-summary {
+                grid-template-columns: 30px 1fr auto;
+                grid-template-areas: "idx name score" "idx info score";
+                gap: 5px;
             }
+            .course-index { grid-area: idx; align-self: start; padding-top: 5px; }
+            .input-name { grid-area: name; font-size: 1.1rem; }
+            .mobile-info { grid-area: info; display: flex; gap: 10px; color: var(--text-muted); font-size: 0.85rem; }
+            .score-cell { grid-area: score; text-align: right; }
+            .desktop-only { display: none; }
+        }
 
-            .sub-name-input { grid-area: name; width: 100%; }
-            .sub-credit-input { grid-area: credit; width: 100%; }
-            .sub-total-display { grid-area: score; align-self: center; }
-            .btn-del-sub { grid-area: del; height: 100%; }
+        /* 載入動畫 */
+        .progress-bar {
+            width: 100%; height: 4px; background: #333; margin-top: 10px;
+            border-radius: 2px; overflow: hidden; display: none;
+        }
+        .progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s; }
 
-            /* 細項變成兩行 */
-            .comp-row {
-                flex-wrap: wrap;
-                background: #f9fafb;
-                padding: 5px;
-                border-radius: 6px;
-            }
-            .comp-name { width: 100%; flex: none; margin-bottom: 2px; } /* 名稱獨佔一行 */
-            .comp-score, .comp-weight { flex: 1; } /* 分數權重並排 */
+        .fab-add {
+            position: fixed; bottom: 100px; right: 20px;
+            width: 50px; height: 50px; border-radius: 50%;
+            background: var(--accent-gold); color: #2d3e46;
+            font-size: 30px; border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            cursor: pointer; z-index: 101;
+            display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="dashboard">
-        <div class="stat-box">
-            <div class="stat-val" id="topAvg">0.0</div>
-            <div class="stat-label">學期加權平均</div>
-        </div>
-        <div class="stat-box" style="border-left: 1px solid rgba(255,255,255,0.2);">
-            <div class="stat-val" id="topCredits">0</div>
-            <div class="stat-label">總學分</div>
-        </div>
+    <h2>學期成績模擬系統</h2>
+
+    <div class="ocr-section">
+        <button class="btn-ocr" onclick="document.getElementById('fileInput').click()">
+            📷 上傳截圖自動匯入
+        </button>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleImage(this)">
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="ocr-status" id="ocrStatus">系統準備就緒，請上傳包含表格的成績單截圖</div>
     </div>
 
-    <div id="app"></div>
+    <div class="list-header">
+        <div>#</div><div>課程</div><div>修別</div><div>學分</div><div>總成績</div><div></div>
+    </div>
 
-    <div style="text-align: center; margin-top: 30px;">
-        <button onclick="resetAll()" style="background:none; border:none; color:#6b7280; text-decoration:underline;">清空所有資料</button>
+    <div id="courseList"></div>
+
+    <div style="text-align: center; margin-top: 20px;">
+        <button onclick="resetData()" style="background:none; border:none; color: #546e7a; text-decoration:underline;">清空資料</button>
     </div>
 </div>
 
-<button class="fab" onclick="addNewSubject()">+</button>
+<div class="footer-stats">
+    <div class="stat-group"><div class="stat-label">總修習</div><div class="stat-value" id="totalAttempted">0</div></div>
+    <div class="stat-group"><div class="stat-label">不及格</div><div class="stat-value danger" id="totalFailed">0</div></div>
+    <div class="stat-group"><div class="stat-label">實得</div><div class="stat-value" id="totalEarned">0</div></div>
+    <div class="stat-group"><div class="stat-label">平均</div><div class="stat-value" id="semesterAvg" style="color: #4ecdc4;">0.00</div></div>
+</div>
+
+<button class="fab-add" onclick="addCourse()">+</button>
 
 <script>
-    // 核心數據
-    let subjects = JSON.parse(localStorage.getItem('fixedGrades')) || [
-        {
-            id: Date.now(),
-            name: '微積分',
-            credit: 3,
-            components: [
-                { id: 1, name: '期中考', score: 80, weight: 30 },
-                { id: 2, name: '期末考', score: 90, weight: 40 },
-                { id: 3, name: '平時', score: 85, weight: 30 }
-            ]
-        }
-    ];
+    let courses = JSON.parse(localStorage.getItem('ocrGrades')) || [];
 
-    const app = document.getElementById('app');
-
-    // 1. 初始化渲染 (只在頁面載入或新增/刪除時呼叫，打字時不呼叫)
-    function render() {
-        app.innerHTML = '';
+    // --- 圖像識別邏輯 ---
+    async function handleImage(input) {
+        if (!input.files || !input.files[0]) return;
         
-        subjects.forEach((sub, subIdx) => {
-            const card = document.createElement('div');
-            card.className = 'subject-card';
-            
-            // 計算內部 HTML
-            let compsHtml = '';
-            sub.components.forEach((comp, compIdx) => {
-                compsHtml += `
-                    <div class="comp-row">
-                        <input type="text" class="comp-name" placeholder="項目" value="${comp.name}" 
-                            oninput="updateData(${subIdx}, ${compIdx}, 'name', this.value)">
-                        <input type="number" class="comp-score" placeholder="分數" value="${comp.score}" inputmode="decimal"
-                            oninput="updateData(${subIdx}, ${compIdx}, 'score', this.value)">
-                        <input type="number" class="comp-weight" placeholder="%" value="${comp.weight}" inputmode="decimal"
-                            oninput="updateData(${subIdx}, ${compIdx}, 'weight', this.value)">
-                        <button class="btn-del-comp" onclick="delComp(${subIdx}, ${compIdx})">×</button>
-                    </div>
-                `;
+        const file = input.files[0];
+        const statusEl = document.getElementById('ocrStatus');
+        const bar = document.getElementById('progressBar');
+        const fill = document.getElementById('progressFill');
+
+        bar.style.display = 'block';
+        statusEl.innerText = "正在初始化識別引擎 (首次需要下載中文包)...";
+
+        try {
+            // 使用 Tesseract 進行識別
+            const worker = Tesseract.createWorker({
+                logger: m => {
+                    if(m.status === 'recognizing text') {
+                        fill.style.width = `${m.progress * 100}%`;
+                        statusEl.innerText = `正在讀取文字... ${Math.round(m.progress * 100)}%`;
+                    } else {
+                        statusEl.innerText = m.status;
+                    }
+                }
             });
 
-            card.innerHTML = `
-                <div class="subject-header">
-                    <input type="text" class="sub-name-input" placeholder="科目名稱" value="${sub.name}" 
-                        oninput="updateSubject(${subIdx}, 'name', this.value)">
-                    <input type="number" class="sub-credit-input" placeholder="學分" value="${sub.credit}" inputmode="decimal"
-                        oninput="updateSubject(${subIdx}, 'credit', this.value)">
+            await worker.load();
+            await worker.loadLanguage('chi_tra'); // 載入繁體中文
+            await worker.initialize('chi_tra');
+
+            statusEl.innerText = "正在分析圖片...";
+            const { data: { text } } = await worker.recognize(file);
+            
+            console.log("OCR Result:", text); // Debug用
+            
+            // 解析文字
+            const newCourses = parseOCRText(text);
+            
+            await worker.terminate();
+
+            if (newCourses.length > 0) {
+                if(confirm(`成功辨識出 ${newCourses.length} 門課程！是否要覆蓋目前列表？(取消則為追加)`)) {
+                    courses = newCourses;
+                } else {
+                    courses = [...courses, ...newCourses];
+                }
+                render();
+                statusEl.innerText = `成功匯入 ${newCourses.length} 筆資料！請檢查是否有錯字。`;
+            } else {
+                statusEl.innerText = "無法辨識出課程結構，請確認截圖是否清晰，或包含完整的表格行。";
+            }
+
+        } catch (error) {
+            console.error(error);
+            statusEl.innerText = "發生錯誤：" + error.message;
+        } finally {
+            setTimeout(() => { bar.style.display = 'none'; fill.style.width = '0%'; }, 2000);
+        }
+    }
+
+    // --- 智慧解析器 (針對您的截圖格式優化) ---
+    function parseOCRText(text) {
+        const lines = text.split('\n');
+        const detectedCourses = [];
+        
+        // 截圖特徵：每行結尾通常是 "必/選 X XX" (修別 學分 分數)
+        // Regex 解釋：
+        // (.*?) -> 課程名稱 (Group 1)
+        // (必|選) -> 修別 (Group 2)
+        // \s* -> 可能有空白
+        // (\d) -> 學分 (Group 3, 只有1位數)
+        // \s* -> 可能有空白
+        // (\d{1,3}) -> 分數 (Group 4, 1-3位數)
+        // $ -> 行尾
+        // 注意：OCR 經常會把空格吃掉或多加，所以正則要寬鬆一點
+        
+        // 針對截圖中 "---" 的處理，以及可能出現的班級名稱過濾
+        lines.forEach(line => {
+            const cleanLine = line.trim().replace(/\s+/g, ' '); // 壓縮空白
+            
+            // 嘗試尋找結尾是 "數字 數字" 的行 (學分 分數)
+            // 例如: "... 必 3 72" 或 "必3 72"
+            const match = cleanLine.match(/([\u4e00-\u9fa5A-Za-z0-9\(\)\-]+)\s+(必|選)?\s*(\d)\s+(\d{1,3})$/);
+
+            if (match) {
+                let rawName = match[1];
+                const type = match[2] || '必'; // 若沒抓到預設必修
+                const credit = match[3];
+                const score = match[4];
+
+                // 清理名稱：移除前面的序號 (如 "1 ", "10 ") 和 班級 (如 "智產一-2")
+                // 這邊用簡單過濾：移除前面的一串數字，和可能的 "---"
+                rawName = rawName.replace(/^\d+\s+/, ''); // 移除序號
+                rawName = rawName.replace(/^[^\s]+\s+/, ''); // 嘗試移除第一個區塊(通常是班級)
+                rawName = rawName.replace(/---/g, ''); // 移除分隔線
+
+                detectedCourses.push({
+                    id: Date.now() + Math.random(),
+                    name: rawName.trim(),
+                    type: type,
+                    credit: credit,
+                    components: [{ name: '期末', score: score, weight: 100 }]
+                });
+            }
+        });
+
+        return detectedCourses;
+    }
+
+    // --- 介面渲染邏輯 (同前版) ---
+    const listEl = document.getElementById('courseList');
+    
+    function render() {
+        listEl.innerHTML = '';
+        let stats = { attempted: 0, failed: 0, earned: 0, weightedSum: 0, gpaCredits: 0 };
+
+        courses.forEach((c, idx) => {
+            // 計算分數
+            let totalScore = 0;
+            c.components.forEach(comp => {
+                totalScore += (parseFloat(comp.score)||0) * ((parseFloat(comp.weight)||0)/100);
+            });
+            const finalScore = Math.round(totalScore);
+
+            // 統計
+            const credit = parseFloat(c.credit) || 0;
+            stats.attempted += credit;
+            if (finalScore >= 60) stats.earned += credit;
+            else stats.failed += credit;
+            
+            if (credit > 0) { // 排除0學分體育
+                stats.weightedSum += finalScore * credit;
+                stats.gpaCredits += credit;
+            }
+
+            // 建立 DOM
+            const item = document.createElement('div');
+            item.className = 'course-item';
+            item.innerHTML = `
+                <div class="course-summary">
+                    <div class="course-index">${idx + 1}</div>
                     
-                    <div class="sub-total-display">
-                        <div class="sub-score-val" id="score-${sub.id}">0.0</div>
-                        <div class="sub-score-lbl">學期總分</div>
+                    <div style="width:100%">
+                        <input type="text" class="input-name" value="${c.name}" onchange="update(${idx}, 'name', this.value)">
+                        <div class="mobile-info" style="display:${window.innerWidth<=600?'flex':'none'}">
+                            <span>${c.type}</span> <span>${c.credit}學分</span>
+                        </div>
+                    </div>
+
+                    <div class="desktop-only">
+                        <select onchange="update(${idx}, 'type', this.value)">
+                            <option value="必" ${c.type==='必'?'selected':''}>必</option>
+                            <option value="選" ${c.type==='選'?'selected':''}>選</option>
+                        </select>
+                    </div>
+                    <div class="desktop-only">
+                        <input type="number" value="${c.credit}" onchange="update(${idx}, 'credit', this.value)">
+                    </div>
+
+                    <div class="score-cell">
+                        <div class="score-display" style="color: ${finalScore<60?'#ff6b6b':'#fff'}">${finalScore}</div>
                     </div>
                     
-                    <button class="btn-del-sub" onclick="delSubject(${subIdx})">🗑</button>
-                </div>
-                
-                <div class="components-list">
-                    ${compsHtml}
-                    <div class="comp-footer">
-                        <span class="weight-alert" id="weight-${sub.id}">配比: 0%</span>
-                        <button class="btn-add-comp" onclick="addComp(${subIdx})">+ 項目</button>
-                    </div>
+                    <button onclick="del(${idx})" style="border:none; background:none; color:#666; cursor:pointer;">×</button>
                 </div>
             `;
-            app.appendChild(card);
+            listEl.appendChild(item);
         });
 
-        recalcAll(); // 渲染完後計算數值
+        // 更新底部
+        document.getElementById('totalAttempted').innerText = stats.attempted;
+        document.getElementById('totalFailed').innerText = stats.failed;
+        document.getElementById('totalEarned').innerText = stats.earned;
+        const avg = stats.gpaCredits > 0 ? (stats.weightedSum / stats.gpaCredits) : 0;
+        document.getElementById('semesterAvg').innerText = avg.toFixed(2);
+        
+        localStorage.setItem('ocrGrades', JSON.stringify(courses));
     }
 
-    // 2. 數據更新 (打字時觸發，不重繪 DOM)
-    function updateSubject(subIdx, key, val) {
-        subjects[subIdx][key] = val;
-        recalcAll();
-        save();
+    function update(idx, key, val) {
+        courses[idx][key] = val;
+        render(); // 這裡簡單處理，直接重繪
     }
 
-    function updateData(subIdx, compIdx, key, val) {
-        subjects[subIdx].components[compIdx][key] = val;
-        recalcAll();
-        save();
-    }
-
-    // 3. 純計算與更新數值顯示 (這就是解決輸入卡頓的關鍵)
-    function recalcAll() {
-        let totalWeightedScore = 0;
-        let totalCredits = 0;
-
-        subjects.forEach(sub => {
-            let subScore = 0;
-            let subWeight = 0;
-
-            // 算單科
-            sub.components.forEach(c => {
-                const s = parseFloat(c.score) || 0;
-                const w = parseFloat(c.weight) || 0;
-                subScore += s * (w / 100);
-                subWeight += w;
-            });
-
-            // 更新單科顯示 (直接操作 DOM ID，不重繪)
-            const scoreEl = document.getElementById(`score-${sub.id}`);
-            const weightEl = document.getElementById(`weight-${sub.id}`);
-            
-            if(scoreEl) scoreEl.innerText = subScore.toFixed(1);
-            
-            if(weightEl) {
-                weightEl.innerText = `配比: ${subWeight}%`;
-                weightEl.style.color = subWeight === 100 ? '#059669' : (subWeight > 100 ? '#ef4444' : '#d97706');
-            }
-
-            // 算總學期
-            const cred = parseFloat(sub.credit) || 0;
-            if(cred > 0) {
-                totalWeightedScore += subScore * cred;
-                totalCredits += cred;
-            }
-        });
-
-        // 更新頂部儀表板
-        const finalAvg = totalCredits > 0 ? (totalWeightedScore / totalCredits) : 0;
-        document.getElementById('topAvg').innerText = finalAvg.toFixed(2);
-        document.getElementById('topCredits').innerText = totalCredits;
-    }
-
-    // 4. 新增與刪除 (需要重繪 DOM)
-    function addNewSubject() {
-        subjects.push({
-            id: Date.now(),
-            name: '',
-            credit: '',
-            components: [{ name: '期中', score: '', weight: 30 }, { name: '期末', score: '', weight: 40 }]
-        });
+    function addCourse() {
+        courses.push({ id: Date.now(), name: '', type: '必', credit: 3, components: [{score: '', weight: 100}] });
         render();
         window.scrollTo(0, document.body.scrollHeight);
-        save();
     }
 
-    function delSubject(idx) {
-        if(confirm('刪除此科目？')) {
-            subjects.splice(idx, 1);
-            render();
-            save();
-        }
+    function del(idx) {
+        if(confirm('刪除?')) { courses.splice(idx, 1); render(); }
     }
 
-    function addComp(subIdx) {
-        subjects[subIdx].components.push({ name: '', score: '', weight: '' });
-        render();
-        save();
-    }
-
-    function delComp(subIdx, compIdx) {
-        subjects[subIdx].components.splice(compIdx, 1);
-        render();
-        save();
-    }
-
-    function resetAll() {
-        if(confirm('確定清空？')) {
-            subjects = [];
-            render();
-            save();
-        }
-    }
-
-    function save() {
-        localStorage.setItem('fixedGrades', JSON.stringify(subjects));
+    function resetData() {
+        if(confirm('清空?')) { courses = []; render(); }
     }
 
     // 啟動
     render();
-
 </script>
 
 </body>
